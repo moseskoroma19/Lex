@@ -1,0 +1,723 @@
+<title>LEX Legal Assistant</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap">
+<style>
+/* Layout: app shell. Fixed left rail (nav + jurisdiction), top context bar, one working view at a time. Rail collapses to a scrolling tab strip on phones. */
+:root{
+  --bg:#F3F6F7; --surface:#FFFFFF; --sunk:#EAF0F2; --ink:#14212B; --muted:#56687A; --line:#D7E0E5;
+  --accent:#1E5B6B; --accent-ink:#FFFFFF; --accent-soft:#E1EDF0; --brass:#8A6A1F; --brass-soft:#F5EEDC;
+  --high:#B42318; --high-soft:#FDECEA; --med:#A64B05; --med-soft:#FEF2E2; --low:#25704A; --low-soft:#E5F4EB;
+  --f-display:"IBM Plex Serif", Georgia, "Times New Roman", serif;
+  --f-body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0D151B; --surface:#141F27; --sunk:#0F1A21; --ink:#E4EBEF; --muted:#94A6B3; --line:#24343F;
+  --accent:#74B6C6; --accent-ink:#0B1A20; --accent-soft:#183641; --brass:#D4B46A; --brass-soft:#2F2918;
+  --high:#F7837A; --high-soft:#3A1C1B; --med:#F2AE57; --med-soft:#36270F; --low:#6CCB96; --low-soft:#16301F;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0D151B; --surface:#141F27; --sunk:#0F1A21; --ink:#E4EBEF; --muted:#94A6B3; --line:#24343F;
+  --accent:#74B6C6; --accent-ink:#0B1A20; --accent-soft:#183641; --brass:#D4B46A; --brass-soft:#2F2918;
+  --high:#F7837A; --high-soft:#3A1C1B; --med:#F2AE57; --med-soft:#36270F; --low:#6CCB96; --low-soft:#16301F;
+  color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55}
+h1,h2,h3{font-family:var(--f-display);font-weight:600;text-wrap:balance;margin:0;line-height:1.25}
+h1{font-size:1.6rem} h2{font-size:1.2rem} h3{font-size:1rem}
+p{margin:0}
+a{color:var(--accent)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--f-mono)}
+.eyebrow{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.muted{color:var(--muted)}
+
+.app{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100%}
+.rail{background:var(--surface);border-right:1px solid var(--line);padding:20px 14px;display:flex;flex-direction:column;gap:22px;position:sticky;top:0;height:100vh;overflow:auto}
+.brand{display:flex;align-items:center;gap:10px;padding:0 6px}
+.brand svg{flex:none}
+.brand b{font-family:var(--f-display);font-size:1.25rem;letter-spacing:.01em}
+.brand small{display:block;font-size:.7rem;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+nav ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+nav a{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;text-decoration:none;color:var(--ink);font-weight:500;font-size:.93rem;white-space:nowrap}
+nav a svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7}
+nav a:hover{background:var(--sunk)}
+nav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent)}
+.rail-foot{margin-top:auto;font-size:.78rem;color:var(--muted);border-top:1px solid var(--line);padding:14px 6px 0;display:flex;flex-direction:column;gap:6px}
+.lock{display:flex;gap:8px;align-items:flex-start}
+.lock svg{flex:none;margin-top:2px}
+
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line);padding-block:10px;padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px));display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.ctl{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%}
+.ctl select{min-width:0;max-width:100%;flex:1 1 auto}
+.ctl label{font-size:.78rem;color:var(--muted);font-weight:600}
+select,.input,textarea{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+select{padding-right:6px}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 12px;font-weight:500;cursor:pointer;font-size:.9rem}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.08);color:var(--accent-ink)}
+.btn.sm{padding:4px 9px;font-size:.82rem}
+.notice{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:.8rem;background:var(--brass-soft);color:var(--brass);border-radius:999px;padding:5px 12px;font-weight:500}
+.view{padding-block:24px 48px;padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:20px;max-width:1180px;width:100%}
+.view-head{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:flex-end;justify-content:space-between}
+.view-head p{color:var(--muted);max-width:62ch}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;min-width:0}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.split{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:16px;align-items:start}
+
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;font-size:.74rem;font-weight:600;white-space:nowrap}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.p-high{background:var(--high-soft);color:var(--high)} .p-med{background:var(--med-soft);color:var(--med)} .p-low{background:var(--low-soft);color:var(--low)}
+.p-info{background:var(--accent-soft);color:var(--accent)} .p-brass{background:var(--brass-soft);color:var(--brass)}
+.tag{display:inline-block;font-size:.72rem;border:1px dashed var(--line);color:var(--muted);border-radius:6px;padding:1px 7px}
+
+/* Assistant */
+.chat{display:flex;flex-direction:column;gap:16px}
+.cats{display:flex;flex-wrap:wrap;gap:8px}
+.cat{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:.84rem;cursor:pointer}
+.cat:hover,.cat[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.msg-user{align-self:flex-end;max-width:80%;background:var(--accent);color:var(--accent-ink);padding:10px 14px;border-radius:14px 14px 4px 14px}
+.answer{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.answer-head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--sunk)}
+.answer-head .who{display:flex;gap:8px;align-items:center;font-weight:600;font-size:.88rem}
+.riskrow{display:flex;flex-wrap:wrap;gap:6px}
+.sec{padding:14px 18px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:170px minmax(0,1fr);gap:6px 18px}
+.sec:last-child{border-bottom:0}
+.sec h3{font-family:var(--f-body);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;padding-top:2px}
+.sec ul,.sec ol{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
+.law{display:flex;flex-direction:column;gap:2px;padding:8px 0;border-top:1px dashed var(--line)}
+.law:first-child{border-top:0;padding-top:0}
+.law .cite{font-family:var(--f-mono);font-size:.84rem;font-weight:500}
+.law .row{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.law .note{font-size:.82rem;color:var(--med)}
+.lawyer-box{display:flex;gap:12px;align-items:flex-start}
+.answer-foot{padding:12px 18px;font-size:.8rem;color:var(--muted);background:var(--sunk);border-top:1px solid var(--line)}
+.composer{position:sticky;bottom:0;display:flex;gap:8px;background:var(--bg);padding-block:10px}
+.composer textarea{flex:1;min-width:0;resize:none;height:48px;border-radius:10px;padding:12px}
+.typing{display:flex;gap:4px;padding:14px}
+.typing span{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:b 1s infinite}
+.typing span:nth-child(2){animation-delay:.15s}.typing span:nth-child(3){animation-delay:.3s}
+@keyframes b{0%,80%,100%{opacity:.25}40%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.typing span{animation:none}}
+.side-list{display:flex;flex-direction:column;gap:10px}
+.side-list .item{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:.88rem}
+
+/* Dashboard */
+.stat{display:flex;flex-direction:column;gap:2px}
+.stat b{font-family:var(--f-display);font-size:1.7rem;font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th{text-align:left;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+.tbl{overflow-x:auto}
+.matrix{display:grid;grid-template-columns:auto repeat(3,minmax(0,1fr));gap:4px;font-size:.76rem}
+.matrix .cell{aspect-ratio:1.6;border-radius:6px;background:var(--sunk);display:flex;flex-wrap:wrap;align-content:center;justify-content:center;gap:4px;padding:4px}
+.matrix .lbl{color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center}
+.dot{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:.7rem;font-weight:700;color:#fff}
+.deadline{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.deadline:first-child{border-top:0;padding-top:0}
+.date{flex:none;width:52px;text-align:center;border:1px solid var(--line);border-radius:8px;padding:4px 0;font-variant-numeric:tabular-nums}
+.date b{display:block;font-family:var(--f-display);font-size:1.2rem;line-height:1.1}
+.date small{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+
+/* Review */
+.flag{border:1px solid var(--line);border-left-width:4px;border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:4px}
+.flag.high{border-left-color:var(--high)} .flag.med{border-left-color:var(--med)} .flag.low{border-left-color:var(--low)}
+.flag q{font-style:italic;color:var(--muted);font-size:.86rem}
+textarea.doc{width:100%;min-height:300px;font-family:var(--f-mono);font-size:.82rem;line-height:1.6;resize:vertical}
+.meter{height:8px;background:var(--sunk);border-radius:99px;overflow:hidden;display:flex}
+.meter span{display:block;height:100%}
+
+/* Generator */
+.form{display:grid;gap:12px}
+.form .field{display:flex;flex-direction:column;gap:4px}
+.form label{font-size:.8rem;font-weight:600;color:var(--muted)}
+.form .input,.form textarea{width:100%}
+.paper{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:32px 36px;font-family:var(--f-display);font-weight:500;font-size:.95rem;line-height:1.7;white-space:pre-wrap;box-shadow:0 1px 0 var(--line),0 8px 24px -16px rgba(20,33,43,.35);min-width:0;overflow-wrap:anywhere}
+.paper mark{background:var(--brass-soft);color:var(--brass);border-radius:3px;padding:0 3px}
+
+/* Lawyers */
+.lawyer{display:flex;flex-direction:column;gap:10px}
+.lawyer .top{display:flex;gap:12px;align-items:center}
+.avatar{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-display);font-weight:600;background:var(--accent-soft);color:var(--accent);flex:none}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:.75rem;background:var(--sunk);border-radius:6px;padding:2px 8px}
+.verified{color:var(--low);font-size:.78rem;font-weight:600;display:flex;gap:4px;align-items:center}
+
+/* Updates */
+.update{display:grid;grid-template-columns:110px minmax(0,1fr);gap:4px 18px;padding:14px 0;border-top:1px solid var(--line)}
+.update:first-child{border-top:0}
+.update .when{font-variant-numeric:tabular-nums;color:var(--muted);font-size:.85rem}
+
+/* Privacy */
+.toggle{display:flex;justify-content:space-between;gap:16px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.toggle:first-child{border-top:0}
+.switch{width:40px;height:22px;border-radius:99px;background:var(--line);position:relative;border:0;cursor:pointer;flex:none}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--surface);transition:left .15s}
+.switch[aria-checked="true"]{background:var(--accent)}
+.switch[aria-checked="true"]::after{left:21px}
+.toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:.88rem;z-index:20;max-width:calc(100% - 32px)}
+
+@media (max-width:1000px){.split{grid-template-columns:minmax(0,1fr)}.g3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:860px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .rail{position:static;height:auto;flex-direction:column;gap:10px;padding-block:12px 6px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-right:0;border-bottom:1px solid var(--line)}
+  nav{overflow-x:auto;margin-inline:-4px}
+  nav ul{flex-direction:row}
+  .rail-foot{display:none}
+  .topbar{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .view{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .notice{margin-left:0}
+  .g2,.g3{grid-template-columns:minmax(0,1fr)}
+  .sec{grid-template-columns:minmax(0,1fr)}
+  .update{grid-template-columns:minmax(0,1fr)}
+  .paper{padding:20px}
+  .msg-user{max-width:92%}
+}
+</style>
+
+<div class="app">
+  <aside class="rail">
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="8" fill="var(--accent)"/><path d="M17 8v18M11 26h12M9 13h16M12 13l-3 7h6zM22 13l-3 7h6z" stroke="var(--accent-ink)" stroke-width="1.6" fill="none" stroke-linejoin="round"/></svg>
+      <div><b>LEX</b><small>Legal information</small></div>
+    </div>
+    <nav aria-label="Main"><ul id="nav"></ul></nav>
+    <div class="rail-foot">
+      <div class="lock"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span data-i18n="secure">End-to-end encrypted. Your matters are private to you.</span></div>
+      <span>Demo build · sample data only</span>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="ctl">
+        <label for="jur" data-i18n="jurisdiction">Jurisdiction</label>
+        <select id="jur"></select>
+        <button class="btn sm" id="detect" type="button" title="Suggest a jurisdiction from your device's time zone">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/></svg><span data-i18n="detect">Detect</span></button>
+      </div>
+      <div class="ctl">
+        <label for="lang" data-i18n="language">Language</label>
+        <select id="lang"><option value="en">English</option><option value="fr">Français</option><option value="es">Español</option></select>
+      </div>
+      <div class="notice" role="note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg><span data-i18n="notice">AI-generated legal information, not legal advice</span></div>
+    </header>
+    <main id="view" class="view"></main>
+  </div>
+</div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- i18n (UI chrome only in this demo) ---------- */
+const I18N = {
+  en:{jurisdiction:"Jurisdiction",detect:"Detect",language:"Language",notice:"AI-generated legal information, not legal advice",secure:"End-to-end encrypted. Your matters are private to you.",
+      assistant:"Assistant",dashboard:"Dashboard",review:"Document review",generate:"Document builder",lawyers:"Find a lawyer",updates:"Legal updates",privacy:"Privacy & security",
+      ask:"Describe your situation in your own words…",send:"Ask",
+      s_summary:"Your situation",s_jur:"Jurisdiction",s_laws:"Relevant law",s_rights:"Rights & obligations",s_options:"Your options",s_risks:"Risks & consequences",s_steps:"Next steps",s_refs:"Sources",s_lawyer:"Do you need a lawyer?"},
+  fr:{jurisdiction:"Juridiction",detect:"Détecter",language:"Langue",notice:"Information juridique générée par IA, pas un avis juridique",secure:"Chiffrement de bout en bout. Vos dossiers restent privés.",
+      assistant:"Assistant",dashboard:"Tableau de bord",review:"Analyse de documents",generate:"Générateur de documents",lawyers:"Trouver un avocat",updates:"Actualités juridiques",privacy:"Confidentialité",
+      ask:"Décrivez votre situation avec vos propres mots…",send:"Envoyer",
+      s_summary:"Votre situation",s_jur:"Juridiction",s_laws:"Textes applicables",s_rights:"Droits et obligations",s_options:"Vos options",s_risks:"Risques et conséquences",s_steps:"Prochaines étapes",s_refs:"Sources",s_lawyer:"Faut-il un avocat ?"},
+  es:{jurisdiction:"Jurisdicción",detect:"Detectar",language:"Idioma",notice:"Información jurídica generada por IA, no asesoramiento legal",secure:"Cifrado de extremo a extremo. Sus asuntos son privados.",
+      assistant:"Asistente",dashboard:"Panel",review:"Revisión de documentos",generate:"Generador de documentos",lawyers:"Buscar abogado",updates:"Novedades legales",privacy:"Privacidad y seguridad",
+      ask:"Describa su situación con sus propias palabras…",send:"Preguntar",
+      s_summary:"Su situación",s_jur:"Jurisdicción",s_laws:"Normas aplicables",s_rights:"Derechos y obligaciones",s_options:"Sus opciones",s_risks:"Riesgos y consecuencias",s_steps:"Próximos pasos",s_refs:"Fuentes",s_lawyer:"¿Necesita abogado?"}
+};
+let lang = 'en';
+const t = k => (I18N[lang] && I18N[lang][k]) || I18N.en[k] || k;
+
+/* ---------- Jurisdictions ---------- */
+const JUR = {
+  ew:{name:"England & Wales, United Kingdom", short:"England & Wales", tz:["Europe/London"]},
+  ca:{name:"California, United States", short:"California", tz:["America/Los_Angeles"]},
+  gh:{name:"Ghana", short:"Ghana", tz:["Africa/Accra"]}
+};
+const SOON = ["Nigeria","Kenya","Sierra Leone","South Africa","Ontario, Canada","New South Wales, Australia"];
+let jur = 'ew';
+
+const CATS = [
+  ["employment","Employment","I was dismissed from my job without any warning. Can I challenge it?"],
+  ["property","Property & tenancy","My landlord won't return my deposit after I moved out."],
+  ["consumer","Consumer protection","The laptop I bought two weeks ago stopped working and the shop refuses a refund."],
+  ["family","Family","My partner and I are separating. What happens with the children?"],
+  ["criminal","Criminal","I've been asked to attend a police interview. What are my rights?"],
+  ["contract","Contract","A client hasn't paid my invoice for three months."],
+  ["corporate","Corporate","What do I need to register a small company?"],
+  ["tax","Taxation","I received a tax penalty notice I think is wrong."],
+  ["immigration","Immigration","My work visa expires next month. What are my options?"],
+  ["rights","Human rights","I think I was refused a service because of my religion."]
+];
+
+/* ---------- Worked answers (real, well-known provisions; currency flagged) ---------- */
+const LEG = 'https://www.legislation.gov.uk/ukpga/';
+const CAL = (code, s) => `https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=${code}&sectionNum=${s}`;
+const A = {
+ ew:{
+  employment:{
+   summary:"You were dismissed by your employer without a warning or a fair procedure, and you want to know whether you can challenge the dismissal.",
+   laws:[
+    {c:"Employment Rights Act 1996, s.94",d:"Employees have the right not to be unfairly dismissed.",u:LEG+"1996/18/section/94",v:1},
+    {c:"Employment Rights Act 1996, s.98",d:"The employer must show a potentially fair reason (conduct, capability, redundancy, statutory bar or some other substantial reason) and must have acted reasonably.",u:LEG+"1996/18/section/98",v:1},
+    {c:"Employment Rights Act 1996, s.108",d:"A qualifying period of continuous employment applies to most unfair dismissal claims.",u:LEG+"1996/18/section/108",v:0,n:"Being changed by the Employment Rights Act 2025, with reforms phased in during 2026–27. Confirm the period that applies on your dismissal date."},
+    {c:"Employment Rights Act 1996, s.111",d:"A tribunal claim must normally be presented within three months of the effective date of termination (extended by ACAS early conciliation).",u:LEG+"1996/18/section/111",v:1},
+    {c:"ACAS Code of Practice on Disciplinary and Grievance Procedures",d:"Tribunals may adjust compensation by up to 25% where an employer unreasonably fails to follow the Code.",u:"https://www.acas.org.uk/",v:1}
+   ],
+   rights:["Not to be unfairly dismissed once you meet the qualifying period.","Statutory minimum notice (s.86): one week per complete year of service, up to 12 weeks, unless dismissed for gross misconduct.","Some dismissals are automatically unfair from day one, for example for whistleblowing, pregnancy, or asserting a statutory right.","Your obligation: notify ACAS for early conciliation before you can bring a tribunal claim.","Your obligation: take reasonable steps to find new work, as compensation can be reduced if you don't."],
+   options:["Appeal internally using your employer's procedure.","ACAS early conciliation: free and confidential, and it may lead to a settlement.","Employment tribunal claim for unfair dismissal and any unpaid notice or holiday pay.","Negotiate a settlement agreement (you need independent advice for it to be binding)."],
+   risks:["Missing the time limit usually ends the claim. This is the biggest risk.","Compensation can be reduced if you contributed to the dismissal or failed to appeal.","If you have less than the qualifying service, only automatically unfair or discrimination claims may be available."],
+   steps:["Write a timeline of what happened, with dates, while you remember it.","Ask your employer for the reasons for dismissal in writing.","Lodge an internal appeal if one is offered.","Notify ACAS within three months less one day of your termination date.","Speak to an employment solicitor, union representative, or Citizens Advice."],
+   lawyer:{lvl:"Recommended",cls:"p-med",txt:"Advice is recommended if you are close to the qualifying period, suspect discrimination, or are offered a settlement agreement (which legally requires independent advice)."},
+   risk:{u:["High","p-high"],c:["Medium","p-med"],x:["Medium","p-med"]},
+   unc:"Statutory employment rights are changing under the Employment Rights Act 2025. LEX flags these provisions for re-checking against the date of your dismissal."
+  },
+  property:{
+   summary:"Your tenancy has ended and your landlord has not returned your deposit.",
+   laws:[
+    {c:"Housing Act 2004, s.213",d:"Deposits for assured shorthold tenancies must be protected in a government-approved scheme within 30 days, with prescribed information given to the tenant.",u:LEG+"2004/34/section/213",v:1},
+    {c:"Housing Act 2004, s.214",d:"If the landlord fails to comply, the court may order repayment of the deposit and a further sum of between one and three times the deposit.",u:LEG+"2004/34/section/214",v:1},
+    {c:"Tenant Fees Act 2019",d:"Caps most tenancy deposits at five weeks' rent where annual rent is under £50,000.",u:LEG+"2019/4/contents",v:1},
+    {c:"Renters' Rights Act 2025",d:"Reforms private tenancies in England, including ending section 21 'no-fault' evictions.",u:LEG+"2025/26/contents",v:0,n:"Being phased in. Check which changes applied during your tenancy."}
+   ],
+   rights:["To have your deposit protected and to know which scheme holds it.","To dispute deductions through the scheme's free dispute service.","The landlord may only deduct for unpaid rent or damage beyond fair wear and tear.","Your obligation: leave the property in the condition recorded at check-in, allowing for fair wear and tear."],
+   options:["Request the deposit back in writing with a 14-day deadline.","Raise a dispute with the deposit scheme (DPS, mydeposits, or TDS).","If the deposit was never protected, claim under s.214 in the county court.","Small claims court for amounts that aren't covered by a scheme."],
+   risks:["Low financial risk: scheme dispute resolution is free.","A s.214 claim must be brought within six years of the breach.","You may need evidence such as check-in and check-out reports and photos."],
+   steps:["Check whether the deposit is protected using the three scheme websites.","Send a written request to your landlord or agent.","If they refuse, open a dispute with the scheme.","Keep copies of your tenancy agreement, inventory, and photos."],
+   lawyer:{lvl:"Usually not needed",cls:"p-low",txt:"Most deposit disputes are resolved through the free scheme process. Consider a solicitor for a s.214 claim, where costs and penalties are larger."},
+   risk:{u:["Medium","p-med"],c:["Low","p-low"],x:["Low","p-low"]},
+   unc:"Deposit rules differ in Wales and Scotland in places. This answer applies to England."
+  },
+  consumer:{
+   summary:"A product you bought recently is faulty and the seller is refusing a refund.",
+   laws:[
+    {c:"Consumer Rights Act 2015, s.9",d:"Goods must be of satisfactory quality.",u:LEG+"2015/15/section/9",v:1},
+    {c:"Consumer Rights Act 2015, s.22",d:"The short-term right to reject faulty goods for a full refund lasts 30 days from delivery.",u:LEG+"2015/15/section/22",v:1},
+    {c:"Consumer Rights Act 2015, ss.23–24",d:"After 30 days, you can ask for repair or replacement, then a price reduction or final right to reject.",u:LEG+"2015/15/section/23",v:1},
+    {c:"Consumer Credit Act 1974, s.75",d:"If you paid by credit card and the item cost £100 to £30,000, the card provider is jointly liable.",u:LEG+"1974/39/section/75",v:1}
+   ],
+   rights:["A full refund if you reject the goods within 30 days.","Your contract is with the seller, not the manufacturer.","Your obligation: return the goods or make them available for collection."],
+   options:["Reject the goods in writing and ask for a full refund.","Accept a repair or replacement if you prefer.","Claim from your card provider (s.75 or chargeback).","Small claims court as a last resort."],
+   risks:["After 30 days your remedies narrow.","Damage you caused is not covered."],
+   steps:["Write to the seller citing the Consumer Rights Act 2015, s.22.","Keep the receipt and photos of the fault.","If refused, contact your card provider."],
+   lawyer:{lvl:"Not needed",cls:"p-low",txt:"Consumer disputes of this size are normally handled yourself or through Citizens Advice."},
+   risk:{u:["Medium","p-med"],c:["Low","p-low"],x:["Low","p-low"]},
+   unc:"Act within the 30-day window. LEX counts it from the delivery date you give."
+  }
+ },
+ ca:{
+  employment:{
+   summary:"You were fired without warning and want to know whether the termination was lawful.",
+   laws:[
+    {c:"Cal. Labor Code § 2922",d:"Employment with no specified term is presumed to be 'at will' and may be ended by either party.",u:CAL("LAB","2922"),v:1},
+    {c:"Tameny v. Atlantic Richfield Co. (1980) 27 Cal.3d 167",d:"California Supreme Court recognised a claim for termination in violation of public policy.",u:"",v:1},
+    {c:"Cal. Gov. Code § 12940 (FEHA)",d:"Prohibits termination because of protected characteristics and retaliation for protected activity.",u:CAL("GOV","12940"),v:1},
+    {c:"Cal. Labor Code §§ 201, 203",d:"Final wages are due immediately on discharge. Late payment can trigger waiting-time penalties of up to 30 days' wages.",u:CAL("LAB","201"),v:1}
+   ],
+   rights:["To be paid all final wages, including accrued vacation, at the time of termination.","Not to be fired for a discriminatory or retaliatory reason, or one that violates public policy.","Your obligation: file a complaint with the Civil Rights Department before suing under FEHA."],
+   options:["Demand unpaid final wages in writing.","File a wage claim with the Labor Commissioner.","File a complaint with the California Civil Rights Department.","Bring a wrongful termination lawsuit with an attorney."],
+   risks:["Without discrimination, retaliation or a contract, at-will termination is usually lawful.","FEHA complaints must generally be filed within three years."],
+   steps:["Check your final paycheck and date it was received.","Save emails, reviews and any messages about the firing.","Consult an employment attorney (many work on contingency)."],
+   lawyer:{lvl:"Recommended",cls:"p-med",txt:"Recommended if discrimination, retaliation or whistleblowing may be involved."},
+   risk:{u:["Medium","p-med"],c:["Medium","p-med"],x:["Medium","p-med"]},
+   unc:"Whether your firing was unlawful depends on facts the assistant will ask about next, such as the reason given and any protected activity."
+  },
+  property:{
+   summary:"You moved out and your landlord has not returned your security deposit.",
+   laws:[
+    {c:"Cal. Civ. Code § 1950.5",d:"The landlord must return the deposit, or an itemised statement of deductions, within 21 days after you move out.",u:CAL("CIV","1950.5"),v:1},
+    {c:"Cal. Civ. Code § 1950.5(l)",d:"Bad-faith retention can lead to a penalty of up to twice the deposit, in addition to actual damages.",u:CAL("CIV","1950.5"),v:1},
+    {c:"AB 12 (2023)",d:"Limits most security deposits to one month's rent from 1 July 2024, with an exception for certain small landlords.",u:"",v:0,n:"Check whether the small-landlord exception applies to you."}
+   ],
+   rights:["To an itemised statement with receipts for deductions over $125.","To the return of any amount not lawfully deducted.","Your obligation: give a forwarding address."],
+   options:["Send a demand letter citing § 1950.5.","File in small claims court (up to $12,500 for individuals)."],
+   risks:["Low cost. Small claims doesn't allow lawyers to appear for parties."],
+   steps:["Note your move-out date and count 21 days.","Send a demand letter (use the Document builder).","File in small claims if unpaid."],
+   lawyer:{lvl:"Not needed",cls:"p-low",txt:"Small claims court is designed for people representing themselves."},
+   risk:{u:["Medium","p-med"],c:["Low","p-low"],x:["Low","p-low"]},
+   unc:"Local rent ordinances (for example in Los Angeles or San Francisco) can add rules. Tell LEX your city."
+  }
+ },
+ gh:{
+  employment:{
+   summary:"Your employer ended your employment without warning and you want to know your rights.",
+   laws:[
+    {c:"1992 Constitution of Ghana, Article 24",d:"Every person has the right to work under satisfactory, safe and healthy conditions.",u:"",v:1},
+    {c:"Labour Act, 2003 (Act 651), s.17",d:"Sets the notice required to end a contract of employment, depending on its length.",u:"",v:0,n:"Section numbers are from Act 651 as enacted. Confirm against the current consolidated text."},
+    {c:"Labour Act, 2003 (Act 651), ss.62–63",d:"Set out fair grounds for termination and when a termination is unfair.",u:"",v:0,n:"Confirm against the current consolidated text."},
+    {c:"Labour Act, 2003 (Act 651), s.64",d:"A worker who claims unfair termination may complain to the National Labour Commission.",u:"",v:0,n:"Confirm against the current consolidated text."}
+   ],
+   rights:["To the notice period in your contract or under the Act, or pay in lieu.","Not to be dismissed for reasons the Act treats as unfair, such as union membership or pregnancy.","Your obligation: raise the complaint promptly with the National Labour Commission."],
+   options:["Write to your employer asking for the reason for termination.","Complain to the National Labour Commission.","Negotiate an exit settlement through your union, if you have one."],
+   risks:["Delay can weaken your claim. Confirm time limits with the Commission.","Remedies can include reinstatement or compensation, at the Commission's discretion."],
+   steps:["Gather your contract, pay slips and termination letter.","Contact the National Labour Commission.","Consider advice from a labour lawyer or your union."],
+   lawyer:{lvl:"Recommended",cls:"p-med",txt:"Recommended for drafting your complaint and for any negotiated settlement."},
+   risk:{u:["High","p-high"],c:["Medium","p-med"],x:["Medium","p-med"]},
+   unc:"LEX has fewer verified primary sources for Ghana than for other jurisdictions. Each provision is marked for verification."
+  }
+ }
+};
+
+/* ---------- State ---------- */
+const state = {
+  view:'assistant', cat:'employment',
+  chat:[{role:'user',text:"I was dismissed from my job yesterday without any warning or meeting. I'd worked there for three years. Can I challenge it?",jur:'ew',cat:'employment'}],
+  gen:{tpl:'demand'}
+};
+
+/* ---------- Nav ---------- */
+const ICONS = {
+  assistant:'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>',
+  dashboard:'<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
+  review:'<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/><circle cx="11" cy="14" r="3"/><path d="M13.5 16.5 16 19"/>',
+  generate:'<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
+  lawyers:'<circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14c2 .8 3 3 3 6"/>',
+  updates:'<path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  privacy:'<path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/>'
+};
+const VIEWS = ['assistant','dashboard','review','generate','lawyers','updates','privacy'];
+function renderNav(){
+  $('#nav').innerHTML = VIEWS.map(v=>`<li><a href="#${v}" data-v="${v}" ${state.view===v?'aria-current="page"':''}><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[v]}</svg>${t(v)}</a></li>`).join('');
+}
+
+/* ---------- Helpers ---------- */
+function toast(msg){const el=$('#toast');el.textContent=msg;el.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>el.hidden=true,2600)}
+function classify(text){
+  const s=text.toLowerCase();
+  if(/dismiss|fired|sacked|terminat|let go|my job|employer|redundan/.test(s))return'employment';
+  if(/deposit|landlord|rent|tenan|evict|lease/.test(s))return'property';
+  if(/refund|faulty|broken|stopped working|shop|seller|product|bought/.test(s))return'consumer';
+  for(const [k,l] of CATS){if(s.includes(l.split(' ')[0].toLowerCase()))return k}
+  return state.cat||'employment';
+}
+const catLabel = k => (CATS.find(c=>c[0]===k)||[,k])[1];
+
+function answerHTML(m){
+  const a = (A[m.jur]||{})[m.cat];
+  const J = JUR[m.jur];
+  if(!a){
+    const have = Object.keys(A[m.jur]||{}).map(catLabel).join(', ');
+    return `<article class="answer"><div class="answer-head"><span class="who">LEX · ${esc(J.short)}</span><span class="pill p-info">Needs more detail</span></div>
+    <div class="sec"><h3>${t('s_summary')}</h3><p>You've asked about <b>${esc(catLabel(m.cat))}</b> in ${esc(J.name)}. In the full product, LEX would ask a few follow-up questions (dates, documents, who is involved) and then give a structured answer with verified sources.</p></div>
+    <div class="sec"><h3>In this demo</h3><p>Worked examples are loaded for ${esc(J.short)}: <b>${esc(have)}</b>. Try one of those, or switch jurisdiction. LEX will not produce an answer here rather than guess at the law.</p></div>
+    <div class="answer-foot">When LEX lacks a verified source, it says so instead of guessing.</div></article>`;
+  }
+  const li = arr => '<ul>'+arr.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>';
+  const laws = a.laws.map(l=>`<div class="law"><div class="row"><span class="cite">${esc(l.c)}</span>${l.v?'<span class="pill p-low">Verified source</span>':'<span class="pill p-med">Check currency</span>'}</div><span>${esc(l.d)}</span>${l.n?`<span class="note">${esc(l.n)}</span>`:''}</div>`).join('');
+  const refs = a.laws.map(l=>`<li><span class="mono">${esc(l.c)}</span>${l.u?` · <a href="${esc(l.u)}" target="_blank" rel="noopener">official text</a>`:' · <span class="muted">official copy from the national gazette or law report</span>'}</li>`).join('');
+  return `<article class="answer">
+   <div class="answer-head"><span class="who"><svg width="18" height="18" viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="8" fill="var(--accent)"/><path d="M17 8v18M11 26h12M9 13h16" stroke="var(--accent-ink)" stroke-width="2.2" fill="none"/></svg>LEX · ${esc(catLabel(m.cat))}</span>
+     <div class="riskrow"><span class="pill ${a.risk.u[1]}">Urgency: ${a.risk.u[0]}</span><span class="pill ${a.risk.c[1]}">Complexity: ${a.risk.c[0]}</span><span class="pill ${a.risk.x[1]}">Consequence: ${a.risk.x[0]}</span></div></div>
+   <div class="sec"><h3>${t('s_summary')}</h3><p>${esc(a.summary)}</p></div>
+   <div class="sec"><h3>${t('s_jur')}</h3><p>${esc(J.name)}</p></div>
+   <div class="sec"><h3>${t('s_laws')}</h3><div>${laws}</div></div>
+   <div class="sec"><h3>${t('s_rights')}</h3>${li(a.rights)}</div>
+   <div class="sec"><h3>${t('s_options')}</h3>${li(a.options)}</div>
+   <div class="sec"><h3>${t('s_risks')}</h3>${li(a.risks)}</div>
+   <div class="sec"><h3>${t('s_steps')}</h3><ol>${a.steps.map(x=>`<li>${esc(x)}</li>`).join('')}</ol></div>
+   <div class="sec"><h3>${t('s_refs')}</h3><ul>${refs}</ul></div>
+   <div class="sec"><h3>${t('s_lawyer')}</h3><div class="lawyer-box"><span class="pill ${a.lawyer.cls}">${a.lawyer.lvl}</span><div style="display:flex;flex-direction:column;gap:8px"><p>${esc(a.lawyer.txt)}</p><div><a class="btn sm" href="#lawyers">See verified lawyers in ${esc(J.short)}</a></div></div></div></div>
+   <div class="answer-foot"><b>How sure is this?</b> ${esc(a.unc)} This is AI-generated legal information based on the facts you gave. It is not legal advice from a licensed practitioner.</div>
+  </article>`;
+}
+
+/* ---------- Views ---------- */
+const V = {};
+V.assistant = () => `
+ <div class="view-head"><div><span class="eyebrow">${esc(JUR[jur].name)}</span><h1>What's happening?</h1><p>Describe your situation in plain words. LEX identifies the law that applies where you are and explains your options.</p></div></div>
+ <div class="split">
+  <section class="chat" aria-label="Conversation">
+   <div class="cats" role="group" aria-label="Legal categories">${CATS.map(([k,l])=>`<button type="button" class="cat" data-cat="${k}" aria-pressed="${state.cat===k}">${l}</button>`).join('')}</div>
+   <div id="thread" class="chat">${state.chat.map(m=>m.role==='user'?`<div class="msg-user">${esc(m.text)}</div>`:answerHTML(m)).join('')}</div>
+   <form class="composer" id="composer"><label for="q" class="eyebrow" hidden>Your question</label><textarea id="q" placeholder="${t('ask')}"></textarea><button class="btn primary" type="submit">${t('send')}</button></form>
+  </section>
+  <aside class="grid">
+   <div class="panel"><span class="eyebrow">Risk assessment</span><p style="margin:6px 0 10px" class="muted">Each answer is rated on three scales so you can see what needs attention first.</p>
+    <div class="side-list"><div class="item">Urgency <span class="muted">How soon you must act</span></div><div class="item">Complexity <span class="muted">How many issues interact</span></div><div class="item">Consequence <span class="muted">What's at stake</span></div></div></div>
+   <div class="panel"><span class="eyebrow">How LEX cites the law</span>
+    <div class="side-list" style="margin-top:10px"><div class="item"><span class="pill p-low">Verified source</span><span class="muted">Matched to official text</span></div><div class="item"><span class="pill p-med">Check currency</span><span class="muted">Recently amended or unconfirmed</span></div></div>
+    <p class="muted" style="margin-top:10px;font-size:.85rem">LEX never invents a citation. If it can't find a source, it tells you.</p></div>
+   <div class="panel"><span class="eyebrow">Coming next</span><p class="muted" style="margin-top:6px;font-size:.85rem">${SOON.join(' · ')}</p></div>
+  </aside>
+ </div>`;
+
+const MATTERS = [
+ {n:"Unfair dismissal",c:"Employment",j:"ew",u:2,x:1,s:"ACAS conciliation open",id:1},
+ {n:"Deposit return, Flat 4",c:"Property",j:"ew",u:1,x:0,s:"Awaiting landlord reply",id:2},
+ {n:"Unpaid invoice #0412",c:"Contract",j:"ew",u:0,x:1,s:"Demand letter drafted",id:3}
+];
+const LV=["Low","Medium","High"], LC=["p-low","p-med","p-high"], DC=["var(--low)","var(--med)","var(--high)"];
+V.dashboard = () => `
+ <div class="view-head"><div><span class="eyebrow">Example account</span><h1>Your legal matters</h1><p>Everything you've asked about, the documents you've saved, and the dates you can't miss. These are sample matters for the demo.</p></div><a class="btn primary" href="#assistant">New enquiry</a></div>
+ <div class="grid g3">
+  <div class="panel stat"><span class="eyebrow">Open matters</span><b>3</b><span class="muted">1 high urgency</span></div>
+  <div class="panel stat"><span class="eyebrow">Saved documents</span><b>5</b><span class="muted">2 reviewed this week</span></div>
+  <div class="panel stat"><span class="eyebrow">Consultations</span><b>1</b><span class="muted">Booked for 2 Dec</span></div>
+ </div>
+ <div class="split">
+  <div class="panel"><h2 style="margin-bottom:10px">Matters</h2><div class="tbl"><table><thead><tr><th>Matter</th><th>Area</th><th>Urgency</th><th>Status</th></tr></thead><tbody>
+   ${MATTERS.map(m=>`<tr><td><b>${m.n}</b><br><span class="muted">${JUR[m.j].short}</span></td><td>${m.c}</td><td><span class="pill ${LC[m.u]}">${LV[m.u]}</span></td><td>${m.s}</td></tr>`).join('')}
+  </tbody></table></div></div>
+  <div class="panel"><h2 style="margin-bottom:12px">Deadlines</h2>
+   <div class="deadline"><div class="date"><b>28</b><small>Nov</small></div><div><b>Internal appeal</b><p class="muted">Unfair dismissal · within 5 working days of dismissal letter</p></div></div>
+   <div class="deadline"><div class="date"><b>02</b><small>Dec</small></div><div><b>Consultation with employment solicitor</b><p class="muted">Video call · 30 min</p></div></div>
+   <div class="deadline"><div class="date"><b>23</b><small>Feb</small></div><div><b>Last day to notify ACAS</b><p class="muted">Three months less one day from termination</p></div></div>
+  </div>
+ </div>
+ <div class="grid g2">
+  <div class="panel"><h2 style="margin-bottom:4px">Risk matrix</h2><p class="muted" style="margin-bottom:12px;font-size:.88rem">Matters plotted by urgency and complexity.</p>
+   <div class="matrix" role="img" aria-label="Risk matrix of three matters">
+    <div></div><div class="lbl">Low complexity</div><div class="lbl">Medium</div><div class="lbl">High</div>
+    ${[2,1,0].map(u=>`<div class="lbl">${LV[u]} urgency</div>`+[0,1,2].map(x=>`<div class="cell">${MATTERS.filter(m=>m.u===u&&m.x===x).map(m=>`<span class="dot" style="background:${DC[Math.max(u,x)]}" title="${m.n}">${m.id}</span>`).join('')}</div>`).join('')).join('')}
+   </div>
+   <p class="muted" style="margin-top:10px;font-size:.8rem">${MATTERS.map(m=>`${m.id} = ${m.n}`).join(' · ')}</p></div>
+  <div class="panel"><h2 style="margin-bottom:10px">Saved documents</h2><div class="side-list">
+   ${[["Tenancy agreement.pdf","Reviewed · 2 high-risk clauses","p-high"],["Dismissal letter.pdf","Reviewed · no issues","p-low"],["Demand letter, invoice #0412","Draft","p-info"],["Employment contract.pdf","Reviewed · 1 medium-risk clause","p-med"],["Deposit scheme certificate.pdf","Stored","p-info"]].map(d=>`<div class="item"><span>${d[0]}</span><span class="pill ${d[2]}">${d[1]}</span></div>`).join('')}
+  </div></div>
+ </div>`;
+
+const SAMPLE_DOC = `TENANCY AGREEMENT (sample)
+
+1. The Tenant shall pay a deposit of £1,800, which is non-refundable in all circumstances.
+2. Rent of £1,500 is due on the 1st of each month. A late payment charge of £50 per day applies from the first day rent is late.
+3. The Landlord may enter the Property at any time without notice to carry out inspections.
+4. This agreement will automatically renew for a further 12 months unless the Tenant gives 3 months' notice.
+5. The Tenant shall indemnify the Landlord against all losses of any kind arising from the tenancy.
+6. The Landlord may terminate this agreement at any time without notice.
+7. Any dispute shall be resolved by binding arbitration chosen by the Landlord.
+8. This agreement is governed by the law of England and Wales.`;
+const RULES = [
+ [/non-?refundable/i,"high","Non-refundable deposit","Deposits on assured shorthold tenancies must be protected and are returnable, less lawful deductions (Housing Act 2004, s.213)."],
+ [/late (payment )?(charge|fee)|per day/i,"high","Late payment charge","The Tenant Fees Act 2019 limits late rent fees to interest at 3% above the Bank of England base rate, only after rent is 14 days late."],
+ [/enter .* (at any time|without notice)/i,"high","Entry without notice","Tenants have a right to quiet enjoyment. Landlords generally must give at least 24 hours' written notice to inspect (Landlord and Tenant Act 1985, s.11(6))."],
+ [/terminate .* without notice/i,"high","Termination without notice","A landlord cannot end a tenancy at will. Statutory grounds and court procedures apply, and these are changing under the Renters' Rights Act 2025."],
+ [/automatic(ally)? renew/i,"med","Automatic renewal","Check whether this is enforceable. Under recent reforms, many fixed terms are being replaced by periodic tenancies."],
+ [/indemnif/i,"med","Broad indemnity","An unlimited indemnity may be unfair under the Consumer Rights Act 2015, Part 2, and might not bind you."],
+ [/arbitration/i,"med","Arbitration chosen by one party","One-sided dispute clauses in consumer contracts may be unfair. You may still use the deposit scheme and courts."],
+ [/governed by the law/i,"low","Governing law","Standard clause. It confirms which jurisdiction's law applies."]
+];
+V.review = () => `
+ <div class="view-head"><div><span class="eyebrow">Document analysis</span><h1>Review a document</h1><p>Upload or paste a contract, notice or agreement. LEX flags clauses that may be unfair, unlawful or risky under ${esc(JUR[jur].short)} law.</p></div></div>
+ <div class="split">
+  <div class="panel grid">
+   <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between"><span class="eyebrow">Sample tenancy agreement loaded</span>
+    <label class="btn sm" for="file">Upload .txt<input id="file" type="file" accept=".txt,text/plain" hidden></label></div>
+   <label for="doc" hidden>Document text</label><textarea id="doc" class="doc">${esc(SAMPLE_DOC)}</textarea>
+   <div><button class="btn primary" id="analyse" type="button">Analyse document</button></div>
+  </div>
+  <div class="panel grid" id="findings"></div>
+ </div>`;
+function analyse(){
+  const text=$('#doc').value; const lines=text.split(/\n+/).filter(l=>l.trim());
+  const hits=[];
+  for(const [re,lvl,title,why] of RULES){const line=lines.find(l=>re.test(l)); if(line)hits.push({lvl,title,why,line:line.trim()})}
+  const n={high:0,med:0,low:0}; hits.forEach(h=>n[h.lvl]++);
+  const tot=Math.max(1,hits.length);
+  $('#findings').innerHTML = `<div><span class="eyebrow">Findings</span><h2>${hits.length} clause${hits.length===1?'':'s'} flagged</h2></div>
+   <div class="meter" aria-hidden="true"><span style="width:${n.high/tot*100}%;background:var(--high)"></span><span style="width:${n.med/tot*100}%;background:var(--med)"></span><span style="width:${n.low/tot*100}%;background:var(--low)"></span></div>
+   <div class="riskrow"><span class="pill p-high">${n.high} high</span><span class="pill p-med">${n.med} medium</span><span class="pill p-low">${n.low} low</span></div>
+   ${hits.map(h=>`<div class="flag ${h.lvl}"><b>${h.title}</b><q>${esc(h.line.slice(0,140))}</q><span style="font-size:.88rem">${esc(h.why)}</span></div>`).join('') || '<p class="muted">No risky clauses matched. In the full product, every clause is read in context, not just matched to patterns.</p>'}
+   <p class="muted" style="font-size:.8rem">Review based on England & Wales tenancy law. AI-generated information, not legal advice.</p>`;
+}
+
+const TPL = {
+ demand:{name:"Demand letter",fields:[["from","Your name","Amara Mensah"],["to","Recipient","Northgate Lettings Ltd"],["amount","Amount owed","£1,800.00"],["reason","What it's for","Return of my tenancy deposit for 14 Elm Road, Leeds"],["days","Days to pay","14"]],
+  body:f=>`${f.from}
+[Your address]
+
+${today()}
+
+${f.to}
+[Recipient address]
+
+Dear Sir or Madam,
+
+Formal demand for payment: ${f.amount}
+
+I write regarding ${f.reason}.
+
+The sum of ${f.amount} remains unpaid. I ask that you pay this amount in full within ${f.days} days of the date of this letter.
+
+If I do not receive payment by then, I intend to take further action without further notice. This may include a claim through the courts, in which case I will also seek interest and costs.
+
+Please contact me in writing if you dispute any part of this demand.
+
+Yours faithfully,
+
+${f.from}`},
+ complaint:{name:"Formal complaint",fields:[["from","Your name","Amara Mensah"],["to","Organisation","BrightHome Electricals"],["ref","Order or account reference","Order 55821"],["issue","What went wrong","The laptop I bought on 10 November stopped working after 12 days."],["want","What you want","A full refund under my short-term right to reject"]],
+  body:f=>`${f.from}
+[Your address]
+
+${today()}
+
+Complaints Department
+${f.to}
+
+Reference: ${f.ref}
+
+Dear Sir or Madam,
+
+I am making a formal complaint about ${f.ref}.
+
+${f.issue}
+
+Under the Consumer Rights Act 2015, goods must be of satisfactory quality. I am exercising my rights and request: ${f.want}.
+
+Please respond within 14 days. If the matter is not resolved, I may refer it to an alternative dispute resolution scheme or the courts.
+
+Yours faithfully,
+
+${f.from}`},
+ tenancy:{name:"Tenancy agreement (outline)",fields:[["landlord","Landlord","Kwame Boateng"],["tenant","Tenant","Amara Mensah"],["addr","Property address","14 Elm Road, Leeds"],["rent","Monthly rent","£1,500"],["dep","Deposit","£1,730"]],
+  body:f=>`TENANCY AGREEMENT
+
+Date: ${today()}
+Landlord: ${f.landlord}
+Tenant: ${f.tenant}
+Property: ${f.addr}
+
+1. Rent. The Tenant will pay ${f.rent} per month in advance.
+2. Deposit. The Tenant will pay a deposit of ${f.dep}. The Landlord will protect it in a government-approved scheme within 30 days and give the Tenant the prescribed information.
+3. Access. The Landlord will give at least 24 hours' written notice before visiting, except in an emergency.
+4. Repairs. The Landlord is responsible for the structure, exterior and installations for water, gas, electricity and heating.
+5. Ending the tenancy. Either party may end this tenancy only in the ways permitted by law.
+
+[Check: Tenancy law in England is changing under the Renters' Rights Act 2025. LEX updates this template when the law changes.]
+
+Signed (Landlord) ____________________
+Signed (Tenant) ____________________`}
+};
+function today(){return new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}
+V.generate = () => {
+  const T=TPL[state.gen.tpl];
+  return `<div class="view-head"><div><span class="eyebrow">Document builder</span><h1>Create a legal document</h1><p>Fill in the details and LEX drafts a document suited to ${esc(JUR[jur].short)}. Text in highlight still needs your input.</p></div></div>
+ <div class="split" style="grid-template-columns:minmax(0,1fr) minmax(0,1.4fr)">
+  <form class="panel form" id="genform">
+   <div class="field"><label for="tpl">Document type</label><select id="tpl">${Object.entries(TPL).map(([k,v])=>`<option value="${k}" ${k===state.gen.tpl?'selected':''}>${v.name}</option>`).join('')}<option disabled>Employment contract (coming soon)</option><option disabled>Non-disclosure agreement (coming soon)</option></select></div>
+   ${T.fields.map(([k,l,d])=>`<div class="field"><label for="f_${k}">${l}</label><input class="input" id="f_${k}" name="${k}" value="${esc(d)}"></div>`).join('')}
+   <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" id="copy">Copy text</button><button class="btn" type="button" id="save">Save to dashboard</button></div>
+   <p class="muted" style="font-size:.8rem">Templates are a starting point. Review before sending, and get legal advice for high-value matters.</p>
+  </form>
+  <div class="paper" id="paper"></div>
+ </div>`;
+};
+function renderPaper(){
+  const T=TPL[state.gen.tpl]; const f={};
+  T.fields.forEach(([k])=>f[k]=($('#f_'+k).value||'').trim()||`[${k}]`);
+  $('#paper').innerHTML = esc(T.body(f)).replace(/\[[^\]]+\]/g,m=>`<mark>${m}</mark>`);
+}
+
+const LAWYERS = [
+ {n:"Harriet Coleman",j:"ew",firm:"Coleman Employment Law",areas:["Employment","Discrimination"],yrs:14,fee:"Fixed-fee first call £95",langs:["English"]},
+ {n:"Daniel Osei",j:"ew",firm:"Osei & Partners",areas:["Property","Consumer"],yrs:9,fee:"Free 15-min call",langs:["English","Twi"]},
+ {n:"Sofia Ramírez",j:"ca",firm:"Ramírez Workplace Law",areas:["Employment","Wage claims"],yrs:11,fee:"Contingency available",langs:["English","Español"]},
+ {n:"Michael Tran",j:"ca",firm:"Tran Tenant Advocates",areas:["Property","Small claims coaching"],yrs:7,fee:"$150 consultation",langs:["English","Tiếng Việt"]},
+ {n:"Efua Asante",j:"gh",firm:"Asante Chambers",areas:["Employment","Corporate"],yrs:12,fee:"GH₵ consultation fee on request",langs:["English","Twi","Ga"]},
+ {n:"Kofi Mensah-Bonsu",j:"gh",firm:"Mensah-Bonsu Legal",areas:["Property","Family"],yrs:8,fee:"Free first meeting",langs:["English","Ewe"]}
+];
+V.lawyers = () => {
+  const list=LAWYERS.filter(l=>l.j===jur);
+  return `<div class="view-head"><div><span class="eyebrow">${esc(JUR[jur].name)}</span><h1>Find a lawyer</h1><p>Lawyers whose practising status LEX checks with the regulator for ${esc(JUR[jur].short)}. Profiles below are fictional examples for this demo.</p></div></div>
+  <div class="grid g2">${list.map(l=>`<div class="panel lawyer"><div class="top"><div class="avatar">${l.n.split(' ').map(w=>w[0]).join('').slice(0,2)}</div><div><b>${l.n}</b><div class="muted" style="font-size:.86rem">${l.firm} · ${l.yrs} years</div></div><span class="tag" style="margin-left:auto">Sample profile</span></div>
+   <span class="verified"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 5 5 9-10"/></svg>Practising status verified</span>
+   <div class="chips">${l.areas.map(a=>`<span class="chip">${a}</span>`).join('')}${l.langs.map(a=>`<span class="chip">${a}</span>`).join('')}</div>
+   <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span class="muted" style="font-size:.86rem">${l.fee}</span><button class="btn sm primary" type="button" data-book="${l.n}">Request consultation</button></div></div>`).join('')}</div>
+  <div class="panel"><b>Sharing your matter.</b> <span class="muted">When you request a consultation, you choose which matter summary and documents the lawyer can see. Nothing is shared until you confirm.</span></div>`;
+};
+
+const UPDATES = [
+ {d:"2026",j:"ew",t:"Renters' Rights Act 2025",s:"Reforms private renting in England, including ending section 21 'no-fault' evictions and moving most tenancies onto a periodic basis. Changes are being brought in by stages.",cat:"Property"},
+ {d:"2026–27",j:"ew",t:"Employment Rights Act 2025",s:"Phased changes to day-one rights, statutory sick pay and unfair dismissal qualifying periods. LEX re-checks employment answers against each commencement date.",cat:"Employment"},
+ {d:"Jul 2024",j:"ca",t:"Security deposit cap (AB 12)",s:"Most residential security deposits are limited to one month's rent, with an exception for certain small landlords.",cat:"Property"},
+ {d:"2025",j:"ca",t:"Deposit photo documentation (AB 2801)",s:"Landlords must take photos of the unit at move-in and move-out and before repairs, to support deposit deductions.",cat:"Property"},
+ {d:"Example",j:"gh",t:"How you'll be alerted",s:"When Parliament passes or amends a law that affects one of your matters, LEX flags the matter, explains what changed, and re-checks earlier answers.",cat:"Alerts"}
+];
+V.updates = () => `<div class="view-head"><div><span class="eyebrow">Legal updates</span><h1>What's changed</h1><p>LEX monitors official sources for amendments, new regulations and court decisions, and tells you when a change affects one of your matters.</p></div>
+  <div class="ctl"><label for="upf">Show</label><select id="upf"><option value="mine">${esc(JUR[jur].short)}</option><option value="all">All jurisdictions</option></select></div></div>
+  <div class="panel" id="uplist"></div>
+  <p class="muted" style="font-size:.82rem">Demo feed: items reflect the law as understood in mid-2026. In the live product each item links to the gazette or official record and shows when it was last checked.</p>`;
+function renderUpdates(){
+  const all=$('#upf').value==='all'; const list=UPDATES.filter(u=>all||u.j===jur);
+  $('#uplist').innerHTML = list.map(u=>`<div class="update"><span class="when">${u.d}</span><div style="display:flex;flex-direction:column;gap:4px"><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><b>${u.t}</b><span class="chip">${JUR[u.j].short}</span><span class="chip">${u.cat}</span></div><span class="muted">${u.s}</span></div></div>`).join('') || '<p class="muted">No updates for this jurisdiction yet.</p>';
+}
+
+V.privacy = () => `<div class="view-head"><div><span class="eyebrow">Privacy & security</span><h1>Your information stays yours</h1><p>Legal matters are sensitive. Here is how LEX protects them, and the controls you have.</p></div></div>
+ <div class="grid g2">
+  <div class="panel"><h2 style="margin-bottom:6px">Protection</h2>
+   <div class="side-list">${[["Encryption in transit","TLS 1.3"],["Encryption at rest","AES-256, per-user keys"],["Data residency","Stored in your region"],["Staff access","None without your consent"],["AI training","Your matters are never used"]].map(r=>`<div class="item"><span>${r[0]}</span><span class="pill p-low">${r[1]}</span></div>`).join('')}</div></div>
+  <div class="panel"><h2 style="margin-bottom:6px">Your controls</h2>
+   ${[["mfa","Two-step sign-in",true],["lock","Lock documents with a passcode",true],["ret","Delete conversations after 90 days",false],["share","Allow lawyers to see matter history",false]].map(r=>`<div class="toggle"><label for="sw_${r[0]}">${r[1]}</label><button type="button" class="switch" role="switch" id="sw_${r[0]}" aria-checked="${r[2]}"></button></div>`).join('')}
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn" type="button" data-toast="Export prepared (demo). In the product it arrives by secure link.">Export my data</button><button class="btn" type="button" id="delbtn">Delete my account</button></div>
+   <p id="delconfirm" class="muted" hidden style="margin-top:10px">In the product, this asks you to confirm and then permanently deletes everything. Nothing is deleted in this demo.</p></div>
+ </div>`;
+
+/* ---------- Render & events ---------- */
+function render(){
+  document.querySelectorAll('[data-i18n]').forEach(el=>el.textContent=t(el.dataset.i18n));
+  renderNav();
+  $('#view').innerHTML = V[state.view]();
+  if(state.view==='review')analyse();
+  if(state.view==='generate')renderPaper();
+  if(state.view==='updates')renderUpdates();
+}
+function route(){const h=location.hash.slice(1);state.view=VIEWS.includes(h)?h:'assistant';render();window.scrollTo(0,0)}
+window.addEventListener('hashchange',route);
+
+$('#jur').innerHTML = Object.entries(JUR).map(([k,v])=>`<option value="${k}">${v.name}</option>`).join('')+`<optgroup label="Coming soon">${SOON.map(s=>`<option disabled>${s}</option>`).join('')}</optgroup>`;
+$('#jur').addEventListener('change',e=>{jur=e.target.value;render();toast('Guidance now reflects '+JUR[jur].name)});
+$('#lang').addEventListener('change',e=>{lang=e.target.value;render();if(lang!=='en')toast('Interface translated. In the product, answers are translated too.')});
+$('#detect').addEventListener('click',()=>{
+  let tz='';try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone}catch(e){}
+  const hit=Object.entries(JUR).find(([k,v])=>v.tz.includes(tz));
+  if(hit){jur=hit[0];$('#jur').value=jur;render();toast('Detected '+JUR[jur].name+' from your time zone')}
+  else toast(`Your time zone (${tz||'unknown'}) isn't covered yet. Choose a jurisdiction from the list.`);
+});
+
+document.addEventListener('click',e=>{
+  const c=e.target.closest('[data-cat]');
+  if(c){state.cat=c.dataset.cat;const q=$('#q');q.value=CATS.find(x=>x[0]===state.cat)[2];q.focus();document.querySelectorAll('.cat').forEach(b=>b.setAttribute('aria-pressed',b===c));return}
+  const s=e.target.closest('.switch');
+  if(s){s.setAttribute('aria-checked',s.getAttribute('aria-checked')!=='true');return}
+  const b=e.target.closest('[data-book]');
+  if(b){b.textContent='Request sent (demo)';b.disabled=true;toast('Demo only: no request was sent to '+b.dataset.book);return}
+  const tt=e.target.closest('[data-toast]'); if(tt){toast(tt.dataset.toast);return}
+  if(e.target.id==='delbtn'){$('#delconfirm').hidden=false;return}
+  if(e.target.id==='analyse'){analyse();toast('Analysis complete');return}
+  if(e.target.id==='save'){toast('Saved to your dashboard (demo)');return}
+  if(e.target.id==='copy'){const txt=$('#paper').textContent;
+    navigator.clipboard.writeText(txt).then(()=>toast('Copied to clipboard')).catch(()=>{const r=document.createRange();r.selectNodeContents($('#paper'));const sel=getSelection();sel.removeAllRanges();sel.addRange(r);toast('Text selected. Press Ctrl+C or ⌘C to copy.')});return}
+});
+document.addEventListener('submit',e=>{
+  if(e.target.id!=='composer')return; e.preventDefault();
+  const q=$('#q').value.trim(); if(!q)return;
+  const cat=classify(q); state.cat=cat;
+  state.chat.push({role:'user',text:q});
+  const th=$('#thread');
+  th.insertAdjacentHTML('beforeend',`<div class="msg-user">${esc(q)}</div><div class="answer" id="typing"><div class="typing" aria-label="LEX is checking sources"><span></span><span></span><span></span></div></div>`);
+  $('#q').value='';
+  $('#typing').scrollIntoView({behavior:'smooth',block:'center'});
+  setTimeout(()=>{const m={role:'ai',jur,cat};state.chat.push(m);$('#typing').outerHTML=answerHTML(m);},1100);
+});
+document.addEventListener('keydown',e=>{if(e.target.id==='q'&&e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('#composer').requestSubmit()}});
+document.addEventListener('input',e=>{if(e.target.closest('#genform')&&e.target.id!=='tpl')renderPaper()});
+document.addEventListener('change',e=>{
+  if(e.target.id==='tpl'){state.gen.tpl=e.target.value;render()}
+  if(e.target.id==='upf')renderUpdates();
+  if(e.target.id==='file'&&e.target.files[0]){const r=new FileReader();r.onload=()=>{$('#doc').value=r.result;analyse();toast('Document loaded and analysed')};r.readAsText(e.target.files[0])}
+});
+
+state.chat.push({role:'ai',jur:'ew',cat:'employment'});
+route();
+</script>
